@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "SWeapon.generated.h"
 
+class UCameraShake;
 class UDamageType;
 class UParticleSystem;
 class USkeletalMeshComponent;
@@ -22,11 +23,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	virtual void Fire();
 
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	virtual void StartFire();
+
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	virtual void StopFire();
+
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components")
 	USkeletalMeshComponent* MeshComp;
 
-	void PlayFireFx(FVector TracerEndPoint);
+	void PlayFireFx();
 
 	UPROPERTY(EditAnywhere, Category = "Weapon")
 	float Damage = 20.0f;
@@ -34,19 +41,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	TSubclassOf<UDamageType> DamageType;
 
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
+	TSubclassOf<UCameraShake> CameraShakeType;
+
 	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
 	FName MuzzleSocketName;
 
-	UPROPERTY(VisibleDefaultsOnly, BlueprintReadOnly, Category = "Weapon")
-	FName TracerTargetName;
-
 	UPROPERTY(EditDefaultsOnly)
 	UParticleSystem* MuzzleFx;
-
-	UPROPERTY(EditDefaultsOnly)
-	UParticleSystem* ImpactFx;
-
-	UPROPERTY(EditDefaultsOnly)
-	UParticleSystem* TracerFx;
-
 };

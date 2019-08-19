@@ -7,10 +7,12 @@
 #include "GameFramework/Character.h"
 #include "SCharacter.generated.h"
 
+class USHealthComponent;
 class ASWeapon;
 
 class UCameraComponent;
 class USpringArmComponent;
+
 
 UCLASS()
 class COOPGAME_API ASCharacter : public ACharacter
@@ -47,6 +49,8 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USpringArmComponent* SpringArmComp;
 
+	USHealthComponent* HealthComp;
+
 	bool IsZoomed;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Player")
@@ -59,13 +63,22 @@ protected:
 
 	ASWeapon * CurrentWeapon;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Player")
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Player")
 	TSubclassOf<ASWeapon> WeaponClass;
 
 	UPROPERTY(VisibleDefaultsOnly, Category = "Player")
 	FName WeaponAttachSocketName;
 
-	void Fire();
+	void StartFire();
+
+	void StopFire();
+
+	UFUNCTION()
+	void OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser);
+
+	/* Pawn died previously */
+	UPROPERTY(BlueprintReadOnly, Category = "Player")
+	bool bDied;
 
 public:	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Movement")

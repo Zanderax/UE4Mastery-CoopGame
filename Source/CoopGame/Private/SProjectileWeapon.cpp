@@ -7,6 +7,8 @@
 
 void ASProjectileWeapon::Fire()
 {
+	Super::Fire();
+
 	const FVector SpawnLocation = MeshComp->GetSocketLocation(MuzzleSocketName);
 	APlayerCameraManager * CameraManager = UGameplayStatics::GetPlayerCameraManager(this, 0);
 	const FRotator SpawnRotation = CameraManager->GetCameraRotation();

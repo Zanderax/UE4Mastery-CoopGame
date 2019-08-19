@@ -18,5 +18,5 @@ protected:
 	virtual void Fire() override;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Projectile")
-	TSubclassOf<AActor> ProjectileType;
+		TSubclassOf<AActor> ProjectileType;
 };
