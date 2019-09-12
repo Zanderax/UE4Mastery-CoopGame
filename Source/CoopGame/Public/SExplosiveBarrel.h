@@ -29,9 +29,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly)
 	UStaticMeshComponent* BarrelMesh;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	USHealthComponent* HealthComp;
 
+	UPROPERTY(ReplicatedUsing = OnRep_bHasExploded)
 	bool bHasExploded;
+
+	UFUNCTION()
+	void OnRep_bHasExploded();
 
 	UPROPERTY(EditDefaultsOnly)
 	UParticleSystem* ExplodeFx;

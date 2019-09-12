@@ -8,9 +8,11 @@
 #include "SWeapon.h"
 
 #include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PawnMovementComponent.h"
-#include "Components/CapsuleComponent.h"
+#include "Net/UnrealNetwork.h"
+
 
 
 // Sets default values
@@ -44,18 +46,21 @@ void ASCharacter::BeginPlay()
 	
 	DefaultFOV = CameraComp->FieldOfView;
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-
-	CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-
-	if (CurrentWeapon)
-	{
-		CurrentWeapon->SetOwner(this);
-		CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponAttachSocketName);
-	}
-
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASCharacter::OnHealthChanged);
+	
+	if (Role == ROLE_Authority)
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		CurrentWeapon = GetWorld()->SpawnActor<ASWeapon>(WeaponClass, FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+		if (CurrentWeapon)
+		{
+			CurrentWeapon->SetOwner(this);
+			CurrentWeapon->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, WeaponAttachSocketName);
+		}
+	}
 }
 
 void ASCharacter::MoveForward(float Value)
@@ -111,7 +116,7 @@ void ASCharacter::StopFire()
 	}
 }
 
-void ASCharacter::OnHealthChanged(USHealthComponent* HealthComp, float Health, float HealthDelta, const class UDamageType* DamageType,
+void ASCharacter::OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType,
 	class AController* InstigatedBy, AActor* DamageCauser)
 {
 	if (Health <= 0.0f && !bDied)
@@ -179,3 +184,10 @@ FVector ASCharacter::GetPawnViewLocation() const
 	return CameraComp->GetComponentLocation();
 }
 
+void ASCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASCharacter, CurrentWeapon);
+	DOREPLIFETIME(ASCharacter, bDied);
+}

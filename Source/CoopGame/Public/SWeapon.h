@@ -23,6 +23,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	virtual void Fire();
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerFire();
+
 	UFUNCTION(BlueprintCallable, Category = "Weapon")
 	virtual void StartFire();
 

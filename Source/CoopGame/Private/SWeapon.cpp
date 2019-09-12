@@ -3,8 +3,8 @@
 
 #include "SWeapon.h"
 
-#include "Kismet/GameplayStatics.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
 #include "Particles/ParticleSystem.h"
 
 
@@ -15,6 +15,11 @@ ASWeapon::ASWeapon()
 	RootComponent = MeshComp;
 
 	MuzzleSocketName = "MuzzleSocket";
+
+	SetReplicates(true);
+
+	NetUpdateFrequency = 66.f;
+	MinNetUpdateFrequency = 33.f;
 }
 
 void ASWeapon::StartFire()
@@ -28,7 +33,22 @@ void ASWeapon::StopFire()
 
 void ASWeapon::Fire()
 {
+	if (Role < ROLE_Authority)
+	{
+		ServerFire();
+	}
+
 	PlayFireFx();
+}
+
+void ASWeapon::ServerFire_Implementation()
+{
+	Fire();
+}
+
+bool ASWeapon::ServerFire_Validate()
+{
+	return true;
 }
 
 void ASWeapon::PlayFireFx()

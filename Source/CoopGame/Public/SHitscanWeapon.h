@@ -6,6 +6,20 @@
 #include "SWeapon.h"
 #include "SHitscanWeapon.generated.h"
 
+// Contains information of a single hitscan weapon line
+USTRUCT()
+struct FHitScanTrace
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY()
+	TEnumAsByte<EPhysicalSurface> SurfaceType;
+
+	UPROPERTY()
+	FVector_NetQuantize TraceTo;
+};
+
 /**
  * 
  */
@@ -29,6 +43,8 @@ protected:
 	FTimerHandle TimerHandle_TimeBetweenShots;
 
 	void PlayTracerFx(FVector TracerEndPoint);
+
+	void PlayImpactFx(EPhysicalSurface SurfaceType, FVector ImpactPoint);
 
 	UPROPERTY(EditDefaultsOnly)
 	UParticleSystem* TracerFx;
@@ -57,4 +73,10 @@ protected:
 
 	// Derived from RateOfFire
 	float TimeBetweenShots;
+
+	UPROPERTY(ReplicatedUsing=OnRep_HitScanTrace)
+	FHitScanTrace HitScanTrace;
+
+	UFUNCTION()
+	void OnRep_HitScanTrace();
 };

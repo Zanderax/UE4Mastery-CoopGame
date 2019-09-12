@@ -5,10 +5,11 @@
 
 #include "SHealthComponent.h"
 
-#include "Kismet/GameplayStatics.h"
-
-#include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
+
 
 // Sets default values
 ASExplosiveBarrel::ASExplosiveBarrel()
@@ -32,10 +33,29 @@ void ASExplosiveBarrel::BeginPlay()
 	}
 	BarrelMesh->SetSimulatePhysics(true);
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASExplosiveBarrel::OnHealthChanged);
+
+	SetReplicates(true);
+	SetReplicateMovement(true);
+}
+
+void ASExplosiveBarrel::OnRep_bHasExploded()
+{
+	if (bHasExploded)
+	{
+		Explode();
+	}
 }
 
 void ASExplosiveBarrel::OnHealthChanged(USHealthComponent* OwningHealthComp, float Health, float HealthDelta, const class UDamageType* DamageType, class AController* InstigatedBy, AActor* DamageCauser)
 {
+	if (Role < ROLE_Authority)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("OnHealthChanged - Client"))
+		return;
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("OnHealthChanged - Server"))
+
 	if (Health <= 0.0f && !bHasExploded)
 	{
 		bHasExploded = true;
@@ -64,5 +84,12 @@ void ASExplosiveBarrel::Explode()
 		CompInExplosionRange->AddRadialForce(GetActorLocation(), ExplosionRadius->GetUnscaledSphereRadius(), OtherPropulsionForce, ERadialImpulseFalloff::RIF_Constant, true);
 	}
 
+}
+
+void ASExplosiveBarrel::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASExplosiveBarrel, bHasExploded);
 }
 

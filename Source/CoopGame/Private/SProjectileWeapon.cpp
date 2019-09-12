@@ -7,6 +7,12 @@
 
 void ASProjectileWeapon::Fire()
 {
+	if (Role < ROLE_Authority)
+	{
+		ServerFire();
+		return;
+	}
+
 	Super::Fire();
 
 	const FVector SpawnLocation = MeshComp->GetSocketLocation(MuzzleSocketName);
