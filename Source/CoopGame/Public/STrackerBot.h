@@ -30,7 +30,10 @@ protected:
 	USHealthComponent* HealthComp;
 
 	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
-	USphereComponent* SphereComp;
+	USphereComponent* PlayerDetectionComp;
+
+	UPROPERTY(VisibleDefaultsOnly, Category = "Components")
+	USphereComponent* BotDetectionComp;
 
 	FVector GetNextPathPoint();
 
@@ -71,6 +74,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	float SelfDamageInterval;
 
+	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
+	float PlayerDetectionRadius;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
+	float BotDetectionRadius;
+
 	FTimerHandle TimerHandle_SelfDamage;
 
 	void DamageSelf();
@@ -81,10 +90,31 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "TrackerBot")
 	USoundCue* ExplodeSound;
 
+	UFUNCTION()
+	void OnPlayerDetectionCompOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
+
+	UFUNCTION()
+	void OnBotDetectionCompOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult);
+
+	UFUNCTION()
+	void OnBotDetectionCompOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
+	UPROPERTY(ReplicatedUsing=OnRep_BotsInDetectionRadius, EditDefaultsOnly, Category = "TrackerBot")
+	int BotsInDetectionRadius;
+
+	void InitDetectedBots();
+
+	void UpdateMaterialWithDetectedBots();
+
+	UFUNCTION()
+	void OnRep_BotsInDetectionRadius();
+
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	virtual void NotifyActorBeginOverlap(AActor* OtherActor) override;
 };
 

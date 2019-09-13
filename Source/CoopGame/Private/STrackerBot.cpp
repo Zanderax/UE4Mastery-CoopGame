@@ -11,8 +11,10 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Character.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
+#include "Net/UnrealNetwork.h"
 #include "Sound\SoundCue.h"
 
 
@@ -31,12 +33,24 @@ ASTrackerBot::ASTrackerBot()
 	HealthComp = CreateDefaultSubobject<USHealthComponent>(TEXT("HealthComp"));
 	HealthComp->OnHealthChanged.AddDynamic(this, &ASTrackerBot::HandleTakeDamage);
 
-	SphereComp = CreateDefaultSubobject<USphereComponent>(TEXT("SphereComp"));
-	SphereComp->SetSphereRadius(200);
-	SphereComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
-	SphereComp->SetCollisionResponseToAllChannels(ECR_Ignore);
-	SphereComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
-	SphereComp->SetupAttachment(RootComponent);
+	PlayerDetectionRadius = 200;
+	PlayerDetectionComp = CreateDefaultSubobject<USphereComponent>(TEXT("PlayerDetectionComp"));
+	PlayerDetectionComp->SetSphereRadius(PlayerDetectionRadius);
+	PlayerDetectionComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	PlayerDetectionComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+	PlayerDetectionComp->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	PlayerDetectionComp->OnComponentBeginOverlap.AddDynamic(this, &ASTrackerBot::OnPlayerDetectionCompOverlapBegin);
+	PlayerDetectionComp->SetupAttachment(RootComponent);
+
+	BotDetectionRadius = 400;
+	BotDetectionComp = CreateDefaultSubobject<USphereComponent>(TEXT("BotDetectionComp"));
+	BotDetectionComp->SetSphereRadius(BotDetectionRadius);
+	BotDetectionComp->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	BotDetectionComp->SetCollisionResponseToAllChannels(ECR_Ignore);
+	BotDetectionComp->SetCollisionResponseToChannel(ECC_PhysicsBody, ECR_Overlap);
+	BotDetectionComp->OnComponentBeginOverlap.AddDynamic(this, &ASTrackerBot::OnBotDetectionCompOverlapBegin);
+	BotDetectionComp->OnComponentEndOverlap.AddDynamic(this, &ASTrackerBot::OnBotDetectionCompOverlapEnd);
+	BotDetectionComp->SetupAttachment(RootComponent);
 
 	bUseVelocityChange = false;
 	MovementForce = 1000;
@@ -47,6 +61,8 @@ ASTrackerBot::ASTrackerBot()
 
 	SelfDamage = 40;
 	SelfDamageInterval = 0.5f;
+
+	SetReplicates(true);
 }
 
 // Called when the game starts or when spawned
@@ -57,6 +73,8 @@ void ASTrackerBot::BeginPlay()
 	{
 		// Find inital move to
 		NextPathPoint = GetNextPathPoint();
+
+		InitDetectedBots();
 	}
 }
 
@@ -110,16 +128,18 @@ void ASTrackerBot::SelfDestruct()
 	MeshComp->SetVisibility(false);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	if (ROLE_Authority)
+	if (Role == ROLE_Authority)
 	{
 
 		TArray<AActor*> IgnoredActors;
 		IgnoredActors.Add(this);
 
-		UGameplayStatics::ApplyRadialDamage(this, ExplosionDamage, GetActorLocation(), ExplosionRadius, nullptr, IgnoredActors, this, GetInstigatorController(), true);
+		auto TotalDamage = ExplosionDamage * ( BotsInDetectionRadius + 1 );
+
+		UGameplayStatics::ApplyRadialDamage(this, TotalDamage, GetActorLocation(), ExplosionRadius, nullptr, IgnoredActors, this, GetInstigatorController(), true);
 
 		// Show explosion radius
-		DrawDebugSphere(GetWorld(), GetActorLocation(), ExplosionRadius, 12, FColor::Yellow, false, 2.f, 0, 1.f);
+		//DrawDebugSphere(GetWorld(), GetActorLocation(), ExplosionRadius, 12, FColor::Yellow, false, 2.f, 0, 1.f);
 
 
 		SetLifeSpan(2.f);
@@ -141,28 +161,57 @@ void ASTrackerBot::Tick(float DeltaTime)
 
 		float DistanceToTarget = (GetActorLocation() - NextPathPoint).Size();
 
-		if (DistanceToTarget <= RequireDistanceToTarget)
-		{
-			NextPathPoint = GetNextPathPoint();
-		}
-		else
-		{
-			//Keep moving to next target
-			FVector ForceDirection = NextPathPoint - GetActorLocation();
-			ForceDirection.Normalize();
+		//if (DistanceToTarget <= RequireDistanceToTarget || NextPathPoint.Equals(GetActorLocation(), 10) )
+		//{
+		//	
+		//}
+		NextPathPoint = GetNextPathPoint();
+		//Keep moving to next target
+		FVector ForceDirection = NextPathPoint - GetActorLocation();
+		ForceDirection.Normalize();
 
-			ForceDirection *= MovementForce;
+		ForceDirection *= MovementForce;
 
-			MeshComp->AddForce(ForceDirection, NAME_None, bUseVelocityChange);
+		MeshComp->AddForce(ForceDirection, NAME_None, bUseVelocityChange);
 
-			DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ForceDirection, 32, FColor::Blue, false, 0.f, 0, 1.f);
-		}
+			//DrawDebugDirectionalArrow(GetWorld(), GetActorLocation(), GetActorLocation() + ForceDirection, 32, FColor::Blue, false, 0.f, 0, 1.f);
 
-		DrawDebugSphere(GetWorld(), NextPathPoint, 20, 12, FColor::Yellow, false, 4.f, 1.f);
+		//DrawDebugSphere(GetWorld(), NextPathPoint, 20, 12, FColor::Yellow, false, 4.f, 1.f);
 	}
 }
 
-void ASTrackerBot::NotifyActorBeginOverlap(AActor* OtherActor)
+void ASTrackerBot::InitDetectedBots()
+{
+	if (Role == ROLE_Authority)
+	{
+		TArray<AActor*> OverlappingBots;
+		BotDetectionComp->GetOverlappingActors(OverlappingBots, TSubclassOf<ASTrackerBot>());
+
+		BotsInDetectionRadius = OverlappingBots.Num();
+		UpdateMaterialWithDetectedBots();
+	}
+}
+
+void ASTrackerBot::UpdateMaterialWithDetectedBots()
+{
+	if (!MatInst)
+	{
+		MatInst = MeshComp->CreateAndSetMaterialInstanceDynamicFromMaterial(0, MeshComp->GetMaterial(0));
+	}
+
+	if (MatInst)
+	{
+		MatInst->SetScalarParameterValue("BotsInDetectionRadius", BotsInDetectionRadius);
+		UE_LOG(LogTemp, Log, TEXT("Update BotsInDetectionRadius = %d, On %s"), BotsInDetectionRadius, *UKismetSystemLibrary::GetDisplayName(this))
+	}
+}
+
+void ASTrackerBot::OnRep_BotsInDetectionRadius()
+{
+	UpdateMaterialWithDetectedBots();
+}
+
+void ASTrackerBot::OnPlayerDetectionCompOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
 {
 	if(GetWorldTimerManager().IsTimerActive(TimerHandle_SelfDamage) || bExploded)
 	{
@@ -180,4 +229,47 @@ void ASTrackerBot::NotifyActorBeginOverlap(AActor* OtherActor)
 
 		UGameplayStatics::SpawnSoundAttached(SelfDestructSound, RootComponent);
 	}
+}
+
+void ASTrackerBot::OnBotDetectionCompOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult & SweepResult)
+{
+	if (Role < ROLE_Authority)
+	{
+		return;
+	}
+
+	ASTrackerBot* TrackerBot = Cast<ASTrackerBot>(OtherActor);
+
+	if (!TrackerBot)
+	{
+		return;
+	}
+
+	BotsInDetectionRadius++;
+	UpdateMaterialWithDetectedBots();
+}
+
+void ASTrackerBot::OnBotDetectionCompOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	if (Role < ROLE_Authority)
+	{
+		return;
+	}
+
+	ASTrackerBot* TrackerBot = Cast<ASTrackerBot>(OtherActor);
+
+	if (!TrackerBot)
+	{
+		return;
+	}
+
+	BotsInDetectionRadius--;
+	UpdateMaterialWithDetectedBots();
+}
+
+void ASTrackerBot::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+	DOREPLIFETIME(ASTrackerBot, BotsInDetectionRadius);
 }
