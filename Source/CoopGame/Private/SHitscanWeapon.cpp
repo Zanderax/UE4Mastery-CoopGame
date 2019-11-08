@@ -27,6 +27,7 @@ ASHitscanWeapon::ASHitscanWeapon()
 	BaseDamage = 20.0f;
 	HeadshotMultiplier = 4.0f;
 	RateOfFire = 600;
+	BulletSpread = 2.0f;
 }
 
 void ASHitscanWeapon::StartFire()
@@ -68,6 +69,11 @@ void ASHitscanWeapon::Fire()
 	MyOwner->GetActorEyesViewPoint(EyeLocation, EyeRotation);
 
 	FVector ShotDirection = EyeRotation.Vector();
+
+	float HalfRad = FMath::DegreesToRadians(BulletSpread);
+	ShotDirection = FMath::VRandCone(ShotDirection, HalfRad, HalfRad);
+
+
 	FVector TraceEnd = EyeLocation + (ShotDirection * 10000);
 
 	FCollisionQueryParams QueryParams;
@@ -100,7 +106,7 @@ void ASHitscanWeapon::Fire()
 
 		if (Role == ROLE_Authority)
 		{
-			UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, ShotDirection, Hit, MyOwner->GetInstigatorController(), this, DamageType);
+			UGameplayStatics::ApplyPointDamage(HitActor, ActualDamage, ShotDirection, Hit, MyOwner->GetInstigatorController(), MyOwner, DamageType);
 		}
 
 		PlayImpactFx(SurfaceType, Hit.ImpactPoint);
